@@ -17,12 +17,17 @@ class LokasiController extends Controller
     {
         $data = $request->validate([
             'nama' => 'required',
-            'deskripsi' => 'nullable',
+            'deskripsi' => 'nullable|string',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
         ]);
-
-        Lokasi::create($data);
+        
+        // Kalau deskripsi kosong, isi default
+        if (empty($data['deskripsi'])) {
+            $data['deskripsi'] = 'No Deskripsi';
+        }
+        
+        Lokasi::create($data);        
 
         return response()->json(['message' => 'Lokasi berhasil ditambahkan']);
     }
