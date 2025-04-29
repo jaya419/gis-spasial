@@ -4,7 +4,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>GIS dengan Pin & Lokasi Saya</title>
+  <title>Program Gis</title>
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
@@ -149,18 +149,61 @@
     background-color: white;
     box-shadow: 0px 2px 6px rgba(0,0,0,0.2);
   }
+
+  .input-group {
+  gap: 10px;
+}
+.input-group input {
+  flex-grow: 1;
+}
+.input-group button {
+  flex-shrink: 0;
+  border-radius: 0 10px 10px 0;
+}
   </style>
 </head>
 <body>
 
 <!-- Input dan Tombol Pencarian -->
 <div class="container search-container">
-  <input type="text" id="search" class="form-control" placeholder="Cari lokasi...">
-  <div>
-    <button onclick="cariLokasi()" class="btn btn-primary btn-sm">Cari</button>
-    <button onclick="temukanSaya()" class="btn btn-success btn-sm">Lokasi saat ini</button>
+  <div class="input-group">
+    <input type="text" id="search" class="form-control" placeholder="Cari nama lokasi...">
+    <button onclick="cariLokasi()" class="btn btn-primary">Cari</button>
+    <button onclick="temukanSaya()" class="btn btn-success">Lokasi saat ini</button>
   </div>
 </div>
+
+
+<!-- Modal Tambah Lokasi Baru -->
+<div class="modal" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addModalLabel">Tambah Lokasi Baru</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+      </div>
+      <div class="modal-body">
+        <form id="addForm">
+          <div class="mb-3">
+            <label for="addNama" class="form-label">Nama Lokasi</label>
+            <input type="text" class="form-control" id="addNama" required>
+          </div>
+          <div class="mb-3">
+            <label for="addDeskripsi" class="form-label">Deskripsi Lokasi</label>
+            <textarea class="form-control" id="addDeskripsi" rows="3"></textarea>
+          </div>
+          <input type="hidden" id="addLatitude">
+          <input type="hidden" id="addLongitude">
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn btn-primary" id="saveAddBtn">Simpan Lokasi</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <!-- Peta -->
 <div id="map"></div>
@@ -285,28 +328,15 @@ loadMarkers(locations);
 map.on('click', function(e) {
   var lat = e.latlng.lat;
   var lng = e.latlng.lng;
-  var nama = prompt('Masukkan nama lokasi:');
-  var deskripsi = prompt('Masukkan deskripsi lokasi:');
-
-  if (nama) {
-    $.post('/lokasi', {
-      _token: $('meta[name="csrf-token"]').attr('content'),
-      nama: nama,
-      deskripsi: deskripsi,
-      latitude: lat,
-      longitude: lng
-    }, function(data) {
-      Swal.fire({
-        icon: 'success',
-        title: 'Lokasi Ditambahkan!',
-        text: data.message,
-        confirmButtonText: 'OK'
-      }).then(function() {
-        location.reload();
-      });
-    });
-  }
+  
+  // Simpan koordinat sementara
+  $('#addLatitude').val(lat);
+  $('#addLongitude').val(lng);
+  
+  // Buka modal tambah lokasi
+  $('#addModal').modal('show');
 });
+
 
 // Fungsi edit lokasi menggunakan modal
 function editLokasi(id, namaAwal, deskripsiAwal) {
@@ -345,11 +375,45 @@ $('#saveEditBtn').click(function() {
     Swal.fire({
       icon: 'error',
       title: 'Gagal!',
-      text: 'Nama dan Deskripsi harus diisi!',
+      text: 'Nama Lokasi harus diisi!',
       confirmButtonText: 'OK'
     });
   }
 });
+
+$('#saveAddBtn').click(function() {
+  var nama = $('#addNama').val();
+  var deskripsi = $('#addDeskripsi').val();
+  var lat = $('#addLatitude').val();
+  var lng = $('#addLongitude').val();
+
+  if (nama) {
+  $.post('/lokasi', {
+    _token: $('meta[name="csrf-token"]').attr('content'),
+    nama: nama,
+    deskripsi: deskripsi,
+    latitude: lat,
+    longitude: lng
+  }, function(data) {
+      Swal.fire({
+        icon: 'success',
+        title: 'Lokasi Ditambahkan!',
+        text: data.message,
+        confirmButtonText: 'OK'
+      }).then(function() {
+        location.reload();
+      });
+    });
+  } else {
+    Swal.fire({
+      icon: 'error',
+      title: 'Gagal!',
+      text: 'Nama Lokasi harus diisi!',
+      confirmButtonText: 'OK'
+    });
+  }
+});
+
 
 // Fungsi hapus lokasi dengan konfirmasi modal
 function hapusLokasi(id) {
@@ -380,20 +444,53 @@ $('#confirmDeleteBtn').click(function() {
 
 // Pencarian lokasi
 function cariLokasi() {
-  var searchQuery = $('#search').val().toLowerCase();
+  var searchQuery = $('#search').val().toLowerCase().trim();
+
+  if (searchQuery === '') {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Masukkan kata kunci!',
+      text: 'Ketikkan nama lokasi yang ingin dicari.',
+      confirmButtonText: 'OK'
+    });
+    return;
+  }
+
   var filteredLocations = locations.filter(function(lokasi) {
     return lokasi.nama.toLowerCase().includes(searchQuery);
   });
 
-  loadMarkers(filteredLocations);
+  if (filteredLocations.length > 0) {
+    loadMarkers(filteredLocations);
+    // Fokus ke lokasi pertama hasil pencarian
+    var firstLocation = filteredLocations[0];
+    map.setView([firstLocation.latitude, firstLocation.longitude], 17);
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Ditemukan!',
+      text: `${filteredLocations.length} lokasi cocok ditemukan.`,
+      timer: 2500,
+      showConfirmButton: false
+    });
+  } else {
+    Swal.fire({
+      icon: 'error',
+      title: 'Tidak Ditemukan!',
+      text: 'Lokasi dengan nama tersebut tidak tersedia.',
+      confirmButtonText: 'OK'
+    });
+  }
 }
 
 // Fungsi menemukan lokasi saya
+var userMarker, accuracyCircle;
+
 function temukanSaya() {
   if (navigator.geolocation) {
     Swal.fire({
       title: 'Mencari lokasi Anda...',
-      text: 'Tunggu sebentar ya!',
+      text: 'Harap tunggu beberapa detik.',
       allowOutsideClick: false,
       didOpen: () => {
         Swal.showLoading();
@@ -406,32 +503,42 @@ function temukanSaya() {
       const lng = position.coords.longitude;
       const accuracy = position.coords.accuracy;
 
-      // Fokuskan ke lokasi
-      map.setView([lat, lng], 17);
+      // Hapus marker sebelumnya jika ada
+      if (userMarker) map.removeLayer(userMarker);
+      if (accuracyCircle) map.removeLayer(accuracyCircle);
 
-      // Tambahkan marker lokasi
-      var userMarker = L.marker([lat, lng]).addTo(map)
-        .bindPopup(`
-          <div style="text-align:center;">
-            <b>Lokasi saat ini(Tidak akurat)</b><br/>
-            Akurasi: ${accuracy.toFixed(1)} meter
-          </div>
-        `)
-        .openPopup();
+      // Tambahkan marker lokasi user
+      userMarker = L.marker([lat, lng], {
+        icon: L.icon({
+          iconUrl: 'https://cdn-icons-png.flaticon.com/512/64/64113.png',
+          iconSize: [30, 30],
+          iconAnchor: [15, 30],
+          popupAnchor: [0, -30],
+        })
+      }).addTo(map)
+      .bindPopup(`
+        <div style="text-align:center;">
+          <b>Lokasi Saat Ini</b><br/>
+          Lokasi tidak akurat
+        </div>
+      `).openPopup();
 
       // Tambahkan lingkaran akurasi
-      var accuracyCircle = L.circle([lat, lng], {
-        color: '#1E90FF',
-        fillColor: '#1E90FF',
+      accuracyCircle = L.circle([lat, lng], {
+        color: '#007bff',
+        fillColor: '#007bff',
         fillOpacity: 0.2,
-        radius: 100,
+        radius: 200,
       }).addTo(map);
+
+      // Fokus ke lokasi user
+      map.setView([lat, lng], 17);
 
     }, function(error) {
       Swal.close();
       Swal.fire({
         icon: 'error',
-        title: 'Lokasi tidak ditemukan!',
+        title: 'Gagal!',
         text: error.message
       });
     }, {
@@ -439,7 +546,6 @@ function temukanSaya() {
       timeout: 10000,
       maximumAge: 0
     });
-
   } else {
     Swal.fire({
       icon: 'error',
@@ -448,6 +554,7 @@ function temukanSaya() {
     });
   }
 }
+
 
 </script>
 </body>
